@@ -23,33 +23,81 @@ import (
 )
 
 var (
-	defautLocale = "en-US"
-	message      *goconfig.ConfigFile
+	locales localeStore
 )
 
-// SetDefaultLocale sets the default language for localization.
-func SetDefaultLocale(locale string) {
-	defautLocale = locale
+type locale struct {
+	lang    string
+	message *goconfig.ConfigFile
+}
+
+type localeStore []*locale
+
+// Get locale from localeStore use specify lang string
+func (d *localeStore) getLocale(lang string) (*locale, bool) {
+	for _, l := range locales {
+		if l.lang == lang {
+			return l, true
+		}
+	}
+	return nil, false
+}
+
+// Get target language string
+func (d *localeStore) Get(lang, section, format string) (string, bool) {
+	if locale, ok := d.getLocale(lang); ok {
+		if section == "" {
+			section = "common"
+		}
+		value, err := locale.message.GetValue(section, format)
+		if err == nil {
+			return value, true
+		}
+	}
+	return "", false
 }
 
 // SetMessage sets the message file for localization.
-func SetMessage(filePath string) (err error) {
-	message, err = goconfig.LoadConfigFile(filePath)
+func SetMessage(lang, filePath string) error {
+	message, err := goconfig.LoadConfigFile(filePath)
+	if err == nil {
+		lc := new(locale)
+		lc.lang = lang
+		lc.message = message
+		locales = append(locales, lc)
+	}
 	return err
 }
 
 // A Locale describles the information of localization.
 type Locale struct {
-	CurrentLocale string
+	Lang string
 }
 
 // Tr translate content to target language.
-func Tr(locale, format string, args ...interface{}) string {
-	if locale != defautLocale {
-		value := message.MustValue(locale, format)
-		if value != "" {
-			format = value
-		}
+func (l Locale) Tr(format string, args ...interface{}) string {
+	return Tr(l.Lang, format, args...)
+}
+
+// Trs translate content to target language with specify section.
+func (l Locale) Trs(section, format string, args ...interface{}) string {
+	return Trs(l.Lang, section, format, args...)
+}
+
+// Tr translate content to target language.
+func Tr(lang, format string, args ...interface{}) string {
+	return tr(lang, "", format, args...)
+}
+
+// Trs translate content to target language with specify section.
+func Trs(lang, section, format string, args ...interface{}) string {
+	return tr(lang, section, format, args...)
+}
+
+func tr(lang, section, format string, args ...interface{}) string {
+	value, ok := locales.Get(lang, section, format)
+	if ok {
+		format = value
 	}
 
 	if len(args) > 0 {
@@ -69,9 +117,4 @@ func Tr(locale, format string, args ...interface{}) string {
 		return fmt.Sprintf(format, params...)
 	}
 	return fmt.Sprintf(format)
-}
-
-// Tr translate content to target language.
-func (l Locale) Tr(format string, args ...interface{}) string {
-	return Tr(l.CurrentLocale, format, args...)
 }
