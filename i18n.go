@@ -18,12 +18,13 @@ package i18n
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/Unknwon/goconfig"
 )
 
 var (
-	locales localeStore
+	locales = &localeStore{store: make(map[string]*locale)}
 )
 
 type locale struct {
@@ -31,11 +32,14 @@ type locale struct {
 	message *goconfig.ConfigFile
 }
 
-type localeStore []*locale
+type localeStore struct {
+	langs []string
+	store map[string]*locale
+}
 
 // Get locale from localeStore use specify lang string
 func (d *localeStore) getLocale(lang string) (*locale, bool) {
-	for _, l := range locales {
+	for _, l := range d.store {
 		if l.lang == lang {
 			return l, true
 		}
@@ -47,7 +51,7 @@ func (d *localeStore) getLocale(lang string) (*locale, bool) {
 func (d *localeStore) Get(lang, section, format string) (string, bool) {
 	if locale, ok := d.getLocale(lang); ok {
 		if section == "" {
-			section = "common"
+			section = goconfig.DEFAULT_SECTION
 		}
 		value, err := locale.message.GetValue(section, format)
 		if err == nil {
@@ -57,14 +61,65 @@ func (d *localeStore) Get(lang, section, format string) (string, bool) {
 	return "", false
 }
 
+func (d *localeStore) Add(lc *locale) bool {
+	if _, ok := d.store[lc.lang]; ok {
+		return false
+	}
+	d.langs = append(d.langs, lc.lang)
+	d.store[lc.lang] = lc
+	return true
+}
+
+func (d *localeStore) Reload(langs ...string) error {
+	if len(langs) == 0 {
+		for _, lc := range d.store {
+			err := lc.message.Reload()
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		for _, lang := range langs {
+			if lc, ok := d.getLocale(lang); ok {
+				err := lc.message.Reload()
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Reload locales
+func ReloadLangs(langs ...string) error {
+	return locales.Reload(langs...)
+}
+
+// List all locale languages
+func ListLangs() []string {
+	langs := make([]string, len(locales.langs))
+	copy(langs, locales.langs)
+	return langs
+}
+
+// Check language name if exist
+func IsExist(lang string) bool {
+	_, ok := locales.store[lang]
+	return ok
+}
+
 // SetMessage sets the message file for localization.
 func SetMessage(lang, filePath string) error {
 	message, err := goconfig.LoadConfigFile(filePath)
 	if err == nil {
+		message.BlockMode = false
 		lc := new(locale)
 		lc.lang = lang
 		lc.message = message
-		locales = append(locales, lc)
+		if locales.Add(lc) == false {
+			return fmt.Errorf("Lang %s alread exist", lang)
+		}
 	}
 	return err
 }
@@ -79,22 +134,15 @@ func (l Locale) Tr(format string, args ...interface{}) string {
 	return Tr(l.Lang, format, args...)
 }
 
-// Trs translate content to target language with specify section.
-func (l Locale) Trs(section, format string, args ...interface{}) string {
-	return Trs(l.Lang, section, format, args...)
-}
-
 // Tr translate content to target language.
 func Tr(lang, format string, args ...interface{}) string {
-	return tr(lang, "", format, args...)
-}
+	var section string
+	parts := strings.SplitN(format, ".", 2)
+	if len(parts) == 2 {
+		section = parts[0]
+		format = parts[1]
+	}
 
-// Trs translate content to target language with specify section.
-func Trs(lang, section, format string, args ...interface{}) string {
-	return tr(lang, section, format, args...)
-}
-
-func tr(lang, section, format string, args ...interface{}) string {
 	value, ok := locales.Get(lang, section, format)
 	if ok {
 		format = value
