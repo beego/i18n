@@ -28,6 +28,7 @@ var (
 )
 
 type locale struct {
+	id      int
 	lang    string
 	message *goconfig.ConfigFile
 }
@@ -65,6 +66,7 @@ func (d *localeStore) Add(lc *locale) bool {
 	if _, ok := d.store[lc.lang]; ok {
 		return false
 	}
+	lc.id = len(d.langs)
 	d.langs = append(d.langs, lc.lang)
 	d.store[lc.lang] = lc
 	return true
@@ -109,6 +111,14 @@ func IsExist(lang string) bool {
 	return ok
 }
 
+// Check language name if exist
+func IndexLang(lang string) int {
+	if lc, ok := locales.store[lang]; ok {
+		return lc.id
+	}
+	return -1
+}
+
 // SetMessage sets the message file for localization.
 func SetMessage(lang, filePath string) error {
 	message, err := goconfig.LoadConfigFile(filePath)
@@ -132,6 +142,11 @@ type Locale struct {
 // Tr translate content to target language.
 func (l Locale) Tr(format string, args ...interface{}) string {
 	return Tr(l.Lang, format, args...)
+}
+
+// Index get lang index of LangStore
+func (l Locale) Index() int {
+	return IndexLang(l.Lang)
 }
 
 // Tr translate content to target language.
