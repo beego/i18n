@@ -119,6 +119,14 @@ func IndexLang(lang string) int {
 	return -1
 }
 
+// Get language by index id
+func GetLangByIndex(index int) string {
+	if index < 0 || index >= len(locales.langs) {
+		return ""
+	}
+	return locales.langs[index]
+}
+
 // SetMessage sets the message file for localization.
 func SetMessage(lang, filePath string) error {
 	message, err := goconfig.LoadConfigFile(filePath)
