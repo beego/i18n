@@ -128,8 +128,8 @@ func GetLangByIndex(index int) string {
 }
 
 // SetMessage sets the message file for localization.
-func SetMessage(lang, filePath string) error {
-	message, err := goconfig.LoadConfigFile(filePath)
+func SetMessage(lang, filePath string, appendFiles ...string) error {
+	message, err := goconfig.LoadConfigFile(filePath, appendFiles...)
 	if err == nil {
 		message.BlockMode = false
 		lc := new(locale)
