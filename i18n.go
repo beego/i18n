@@ -28,37 +28,30 @@ var (
 )
 
 type locale struct {
-	id      int
-	lang    string
-	message *goconfig.ConfigFile
+	id              int
+	lang            string
+	langDescription string
+	message         *goconfig.ConfigFile
 }
 
 type localeStore struct {
-	langs []string
-	store map[string]*locale
-}
-
-// Get locale from localeStore use specify lang string
-func (d *localeStore) getLocale(lang string) (*locale, bool) {
-	for _, l := range d.store {
-		if l.lang == lang {
-			return l, true
-		}
-	}
-	return nil, false
+	langs            []string
+	langDescriptions []string
+	store            map[string]*locale
 }
 
 // Get target language string
 func (d *localeStore) Get(lang, section, format string) (string, bool) {
-	if locale, ok := d.getLocale(lang); ok {
+	if locale, ok := d.store[lang]; ok {
 		if section == "" {
 			section = goconfig.DEFAULT_SECTION
 		}
-		value, err := locale.message.GetValue(section, format)
-		if err == nil {
+
+		if value, err := locale.message.GetValue(section, format); err == nil {
 			return value, true
 		}
 	}
+
 	return "", false
 }
 
@@ -66,9 +59,12 @@ func (d *localeStore) Add(lc *locale) bool {
 	if _, ok := d.store[lc.lang]; ok {
 		return false
 	}
+
 	lc.id = len(d.langs)
 	d.langs = append(d.langs, lc.lang)
+	d.langDescriptions = append(d.langDescriptions, lc.langDescription)
 	d.store[lc.lang] = lc
+
 	return true
 }
 
@@ -82,7 +78,7 @@ func (d *localeStore) Reload(langs ...string) error {
 		}
 	} else {
 		for _, lang := range langs {
-			if lc, ok := d.getLocale(lang); ok {
+			if lc, ok := d.store[lang]; ok {
 				err := lc.message.Reload()
 				if err != nil {
 					return err
@@ -90,6 +86,7 @@ func (d *localeStore) Reload(langs ...string) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -103,6 +100,12 @@ func ListLangs() []string {
 	langs := make([]string, len(locales.langs))
 	copy(langs, locales.langs)
 	return langs
+}
+
+func ListLangDescriptions() []string {
+	langDescriptions := make([]string, len(locales.langDescriptions))
+	copy(langDescriptions, locales.langDescriptions)
+	return langDescriptions
 }
 
 // Check language name if exist
@@ -127,14 +130,28 @@ func GetLangByIndex(index int) string {
 	return locales.langs[index]
 }
 
+func GetDescriptionByIndex(index int) string {
+	if index < 0 || index >= len(locales.langDescriptions) {
+		return ""
+	}
+
+	return locales.langDescriptions[index]
+}
+
+func GetDescriptionByLang(lang string) string {
+	return GetDescriptionByIndex(IndexLang(lang))
+}
+
 // SetMessage sets the message file for localization.
-func SetMessage(lang, filePath string, appendFiles ...string) error {
+func SetMessage(lang, langDescription, filePath string, appendFiles ...string) error {
 	message, err := goconfig.LoadConfigFile(filePath, appendFiles...)
 	if err == nil {
 		message.BlockMode = false
 		lc := new(locale)
 		lc.lang = lang
+		lc.langDescription = langDescription
 		lc.message = message
+
 		if locales.Add(lc) == false {
 			return fmt.Errorf("Lang %s alread exist", lang)
 		}
