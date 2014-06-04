@@ -28,16 +28,16 @@ var (
 )
 
 type locale struct {
-	id              int
-	lang            string
-	langDescription string
-	message         *goconfig.ConfigFile
+	id       int
+	lang     string
+	langDesc string
+	message  *goconfig.ConfigFile
 }
 
 type localeStore struct {
-	langs            []string
-	langDescriptions []string
-	store            map[string]*locale
+	langs     []string
+	langDescs []string
+	store     map[string]*locale
 }
 
 // Get target language string
@@ -62,7 +62,7 @@ func (d *localeStore) Add(lc *locale) bool {
 
 	lc.id = len(d.langs)
 	d.langs = append(d.langs, lc.lang)
-	d.langDescriptions = append(d.langDescriptions, lc.langDescription)
+	d.langDescs = append(d.langDescs, lc.langDesc)
 	d.store[lc.lang] = lc
 
 	return true
@@ -102,10 +102,10 @@ func ListLangs() []string {
 	return langs
 }
 
-func ListLangDescriptions() []string {
-	langDescriptions := make([]string, len(locales.langDescriptions))
-	copy(langDescriptions, locales.langDescriptions)
-	return langDescriptions
+func ListLangDescs() []string {
+	langDescs := make([]string, len(locales.langDescs))
+	copy(langDescs, locales.langDescs)
+	return langDescs
 }
 
 // Check language name if exist
@@ -131,25 +131,24 @@ func GetLangByIndex(index int) string {
 }
 
 func GetDescriptionByIndex(index int) string {
-	if index < 0 || index >= len(locales.langDescriptions) {
+	if index < 0 || index >= len(locales.langDescs) {
 		return ""
 	}
 
-	return locales.langDescriptions[index]
+	return locales.langDescs[index]
 }
 
 func GetDescriptionByLang(lang string) string {
 	return GetDescriptionByIndex(IndexLang(lang))
 }
 
-// SetMessage sets the message file for localization.
-func SetMessage(lang, langDescription, filePath string, appendFiles ...string) error {
+func SetMessageWithDesc(lang, langDesc, filePath string, appendFiles ...string) error {
 	message, err := goconfig.LoadConfigFile(filePath, appendFiles...)
 	if err == nil {
 		message.BlockMode = false
 		lc := new(locale)
 		lc.lang = lang
-		lc.langDescription = langDescription
+		lc.langDesc = langDesc
 		lc.message = message
 
 		if locales.Add(lc) == false {
@@ -157,6 +156,11 @@ func SetMessage(lang, langDescription, filePath string, appendFiles ...string) e
 		}
 	}
 	return err
+}
+
+// SetMessage sets the message file for localization.
+func SetMessage(lang, filePath string, appendFiles ...string) error {
+	return SetMessageWithDesc(lang, lang, filePath, appendFiles...)
 }
 
 // A Locale describles the information of localization.
